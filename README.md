@@ -13,7 +13,7 @@ Linux IPS Tool
   Base script: MyNameIsMeerkat (Reworked).  
   Apply function from fbeaudet (reworked).  
 
-What you can do:  
+## What you can do:  
 
 Create IPS Patches  
 Apply IPS Patches  
