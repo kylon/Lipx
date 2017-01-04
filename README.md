@@ -1,17 +1,17 @@
-Lipx 1.0 - kylon  
+Lipx - kylon  
 
 Linux IPS Tool  
 
 ## IPS File Format  
   [zophar.net](http://zerosoft.zophar.net/ips.php)  
 
-
 ## Credits  
   [fbeaudet](https://github.com/fbeaudet/ips.py/blob/master/ips.py)  
   [MyNameIsMeerkat](https://github.com/MyNameIsMeerkat/RetronPy)  
+  itari - python app to apply patches
 
   Base script: MyNameIsMeerkat (Reworked).  
-  Apply function from fbeaudet (reworked).  
+  Apply function from itari (adapted).  
 
 ## What you can do:  
 

@@ -1,11 +1,11 @@
 #! /bin/python
 
-import os
-import sys
-import struct
 import collections
+import os
+import struct
+import sys
 
-VERSION = '1.0'
+VERSION = '1.1'
 _ntuple_diskusage = collections.namedtuple('usage', 'total used free')
 
 
@@ -19,7 +19,7 @@ def disk_usage(path):
 
 
 def usage():
-    print('\nLipx - Linux IPS tool (Kylon)\n\n' +
+    print('\nLipx v' + VERSION + ' - Linux IPS tool\n\n' +
            'Usage:\n' +
            '    lipx.py -a originalFile patchFile\n' +
            '    >[Apply a patch]\n\n' +
@@ -29,6 +29,16 @@ def usage():
            '    >[Create an IPS patch]\n')
 
     sys.exit(1)
+
+
+# Helper function to get an integer from a bytearray (Big endian)
+def get_uint16(data, index):
+    return int((data[index] << 8) | data[index + 1])
+
+
+# Helper function to get an integer from a bytearray (Big endian)
+def get_uint24(data, index):
+    return int((data[index] << 16) | (data[index + 1] << 8) | data[index + 2])
 
 
 class IPS(object):
@@ -44,7 +54,6 @@ class IPS(object):
 
         # IPS file footer 'EOF'
         self.EOF_ASCII = b"\x45\x4f\x46"
-        self.EOF_INTEGER = 4542278
 
         # Lipx Command
         self.cmd = cmd
@@ -64,7 +73,9 @@ class IPS(object):
         self.patch_size = 0
 
     def __call__(self):
-        print('### Lipx v' + VERSION + ' - IPS Linux Tool ###\n')
+        ret = False
+
+        print('### Lipx v' + VERSION + ' - Linux IPS Tool ###\n')
 
         self._setup_files()
 
@@ -74,8 +85,8 @@ class IPS(object):
             ret = self.apply_ips()
 
         if not ret:
-            print('Error')
-            return False
+            print('> Error - __call__ error!')
+            sys.exit(1)
 
         return True
 
@@ -91,19 +102,23 @@ class IPS(object):
         return True
 
     def _setup_files(self):
-        # Check free space on disk
         if not self.__check_disk_space(self.patch_file):
             print('> Not enough space on this disk!\n')
             sys.exit(1)
 
-        #  File object containing the original (base) ROM data
+        if self.cmd == '-ab':
+            if not self.__check_disk_space(self.original_file):
+                print('> Not enough space on this disk!\n')
+                sys.exit(1)
+
+        # File object containing the original (base) ROM data
         try:
             self.original_data = open(self.original_file, 'rb').read()
         except:
             print("> Cannot read %s" % self.original_file + '.\n')
             sys.exit(1)
 
-        #  File object containing the ROM data of the ROM we want to diff against the base to produce the IPS patch
+        # File object containing the modified ROM data (To create IPS patch)
         if self.cmd != '-a' and self.cmd != '-ab':
             try:
                 self.modified_data = open(self.modified_file, 'rb').read()
@@ -111,10 +126,10 @@ class IPS(object):
                 print("> Cannot read %s" % self.modified_file + '.\n')
                 sys.exit(1)
 
-        #  File object for writing the IPS data to
+        # File object containing the IPS patch
         try:
             if self.cmd == '-a' or self.cmd == '-ab':
-                self.patch_file_obj = open(self.patch_file, 'rb').read()
+                self.patch_file_obj = bytearray(open(self.patch_file, 'rb').read())
             else:
                 self.patch_file_obj = open(self.patch_file, 'wb')
         except:
@@ -158,65 +173,61 @@ class IPS(object):
         file_to_patch = self.original_file
 
         if self.cmd == '-ab':
+            try:
+                org_file_cont = bytearray(open(file_to_patch, 'rb').read())
+                open('Patched_'+file_to_patch, 'wb').write(org_file_cont)
+            except:
+                print('> Error - Cannot create Patched_%s' % file_to_patch)
+                sys.exit(1)
+
             file_to_patch = 'Patched_'+self.original_file
 
-        patched = open(file_to_patch, 'wb')
-        os.write(patched.fileno(), self.original_data)
+        patched_file = bytearray(open(file_to_patch, 'rb').read())
 
-        while a < len(self.patch_file_obj):
-            # parse offset
-            offset = struct.unpack(
-                '>1i', struct.pack(
-                    '>4B', 0, self.patch_file_obj[a], self.patch_file_obj[a + 1], self.patch_file_obj[a + 2]
-                )
-            )[0]
+        while a < len(self.patch_file_obj) - 3:
+            # Get offset
+            offset = get_uint24(self.patch_file_obj, a)
+            a += 3
 
-            # check if it's the end of the patch
-            if offset == self.EOF_INTEGER:
-                patched.close()
-                print('> Success - Patch applied to %s' % file_to_patch)
-                return True
+            # Get packet size
+            size = get_uint16(self.patch_file_obj, a)
+            a += 2
 
-            # parse size
-            size = struct.unpack(
-                '>1i', struct.pack(
-                    '>4B', 0, 0, self.patch_file_obj[a + 3], self.patch_file_obj[a + 4]
-                )
-            )[0]
+            if size == 0:
+                # Get RLE repeat count
+                rle_size = get_uint16(self.patch_file_obj, a)
+                a += 2
 
-            # write record content to file
-            os.lseek(patched.fileno(), offset, 0)
+                # Get repeat byte
+                repeat = self.patch_file_obj[a]
+                a += 1
 
-            if size != 0:
-                # Normal record.
-                # 3 bytes offset (not EOF_ASCII), 2 bytes size (not 0), x bytes data
-
-                for x in range(size):
-                    os.write(patched.fileno(), bytes([self.patch_file_obj[a + 5 + x]]))
-
-                # update loop address
-                a += 5 + size
+                for x in range(rle_size):
+                    try:
+                        patched_file[offset + x] = repeat
+                    except:
+                        print('> Error - Unable to parse the patch!')
+                        sys.exit(1)
             else:
-                # RLE record.
-                # 3 bytes offset, 2 bytes size (0), 2 bytes times, 1 bytes data
+                # Normal packet, copy from patch to file
+                for x in range(size):
+                    try:
+                        patched_file[offset + x] = self.patch_file_obj[a]
+                        a += 1
+                    except:
+                        print('> Error - Unable to parse the patch!')
+                        sys.exit(1)
 
-                # parse the number of times to repeat the data
-                times = struct.unpack(
-                    '>1i', struct.pack(
-                        '>4B', 0, 0, self.patch_file_obj[a + 5], self.patch_file_obj[a + 6]
-                    )
-                )[0]
+        try:
+            # Write modified data
+            open(file_to_patch, 'wb').write(patched_file)
+        except:
+            print('> Error - Cannot write to file!')
+            sys.exit(1)
 
-                for x in range(times):
-                    os.write(patched.fileno(), bytes([self.patch_file_obj[a + 7]]))
+        print('> Success - Patch applied to %s' % file_to_patch)
 
-                # update loop address
-                a += 6 + times
-
-        patched.close()
-        print('> Error - Cannot apply the patch!')
-
-        return False
+        return True
 
     def create_ips(self):
         record_begun = False
