@@ -5,7 +5,7 @@ import os
 import struct
 import sys
 
-VERSION = '1.1'
+VERSION = '1.2'
 _ntuple_diskusage = collections.namedtuple('usage', 'total used free')
 
 
@@ -20,13 +20,15 @@ def disk_usage(path):
 
 def usage():
     print('\nLipx v' + VERSION + ' - Linux IPS tool\n\n' +
-           'Usage:\n' +
-           '    lipx.py -a originalFile patchFile\n' +
-           '    >[Apply a patch]\n\n' +
-           '    lipx.py -ab originalFile patchFile\n' +
-           '    >[Create a copy and apply the patch - original is untouched]\n\n' +
-           '    lipx.py -c originalFile modifiedFile\n' +
-           '    >[Create an IPS patch]\n')
+           'Usage:\n\n' +
+           '    == Apply patch\n' +
+           '    lipx.py -a originalFile patchFile\n\n' +
+           '    == Create a copy and apply the patch - original is untouched\n' +
+           '    lipx.py -ab originalFile patchFile [outputFile]\n\n' +
+           '    == Create IPS patch\n' +
+           '    lipx.py -c originalFile modifiedFile [outputFile]\n\n' +
+           'Arguments:\n' +
+           '    [] optional argument\n')
 
     sys.exit(1)
 
@@ -175,12 +177,12 @@ class IPS(object):
         if self.cmd == '-ab':
             try:
                 org_file_cont = bytearray(open(file_to_patch, 'rb').read())
-                open('Patched_'+file_to_patch, 'wb').write(org_file_cont)
+                open(self.modified_file, 'wb').write(org_file_cont)
             except:
-                print('> Error - Cannot create Patched_%s' % file_to_patch)
+                print('> Error - Cannot create %s' % self.modified_file)
                 sys.exit(1)
 
-            file_to_patch = 'Patched_'+self.original_file
+            file_to_patch = self.modified_file
 
         patched_file = bytearray(open(file_to_patch, 'rb').read())
 
@@ -312,24 +314,25 @@ class IPS(object):
 if __name__ == '__main__':
     arg_len = len(sys.argv)
 
-    if arg_len > 1:
-        if sys.argv[1] == '-a' or sys.argv[1] == '-ab':
-            if arg_len != 4:
-                usage()
+    if arg_len < 4:
+        usage()
 
-            ips = IPS(sys.argv[1], sys.argv[2], '', sys.argv[3])
+    if sys.argv[1] == '-a':
+        ips = IPS(sys.argv[1], sys.argv[2], '', sys.argv[3])
+        ips()
 
-            ips()
-        elif sys.argv[1] == '-c':
-            if arg_len != 4:
-                usage()
+    elif sys.argv[1] == '-ab':
+        # sys.argv[4] is user supplied _patched_ file name.
+        # Keep the compability - note the order of arguments.
+        patched_file_name = 'Patched_'+sys.argv[2] if arg_len == 4 else sys.argv[4]
+        ips = IPS(sys.argv[1], sys.argv[2], patched_file_name, sys.argv[3])
+        ips()
 
-            patch_file_name = sys.argv[3]+'.ips'
-            ips = IPS(sys.argv[1], sys.argv[2], sys.argv[3], patch_file_name)
+    elif sys.argv[1] == '-c':
+        patch_file_name = sys.argv[3]+'.ips' if arg_len == 4 else sys.argv[4]
+        ips = IPS(sys.argv[1], sys.argv[2], sys.argv[3], patch_file_name)
+        ips()
 
-            ips()
-        else:
-            usage()
     else:
         usage()
 
