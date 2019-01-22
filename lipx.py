@@ -19,14 +19,16 @@ def disk_usage(path):
 
 
 def usage():
+    this = os.path.basename(sys.argv[0])
+
     print('\nLipx v' + VERSION + ' - Linux IPS tool\n\n' +
            'Usage:\n\n' +
            '    == Apply patch\n' +
-           '    lipx.py -a originalFile patchFile\n\n' +
+           '    ' + this + ' -a originalFile patchFile\n\n' +
            '    == Create a copy and apply the patch - original is untouched\n' +
-           '    lipx.py -ab originalFile patchFile [outputFile]\n\n' +
+           '    ' + this + ' -ab originalFile patchFile [outputFile]\n\n' +
            '    == Create IPS patch\n' +
-           '    lipx.py -c originalFile modifiedFile [outputFile]\n\n' +
+           '    ' + this + ' -c originalFile modifiedFile [outputFile]\n\n' +
            'Arguments:\n' +
            '    [] optional argument\n')
 
