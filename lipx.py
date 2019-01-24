@@ -202,6 +202,10 @@ class IPS(object):
                 rle_size = get_uint16(self.patch_file_obj, a)
                 a += 2
 
+                # Grow the patched file if needed
+                if (offset + rle_size) > len(patched_file):
+                    patched_file += bytearray((offset + rle_size) - len(patched_file))
+
                 # Get repeat byte
                 repeat = self.patch_file_obj[a]
                 a += 1
@@ -213,6 +217,10 @@ class IPS(object):
                         print('> Error - Unable to parse the patch!')
                         sys.exit(1)
             else:
+                # Grow the patched file if needed
+                if (offset + size) > len(patched_file):
+                    patched_file += bytearray((offset + size) - len(patched_file))
+
                 # Normal packet, copy from patch to file
                 for x in range(size):
                     try:
