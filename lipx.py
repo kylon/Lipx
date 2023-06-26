@@ -85,7 +85,7 @@ class IPS(object):
 
         if self.cmd == '-c':
             ret = self.create_ips()
-        elif self.cmd == '-a' or self.cmd == '-ab':
+        elif self.cmd in ('-a', '-ab', '-i'):
             ret = self.apply_ips()
 
         if not ret:
@@ -116,14 +116,15 @@ class IPS(object):
                 sys.exit(1)
 
         # File object containing the original (base) ROM data
-        try:
-            self.original_data = open(self.original_file, 'rb').read()
-        except:
-            print("> Cannot read %s" % self.original_file + '.\n')
-            sys.exit(1)
+        if self.cmd != '-i':
+            try:
+                self.original_data = open(self.original_file, 'rb').read()
+            except:
+                print("> Cannot read %s" % self.original_file + '.\n')
+                sys.exit(1)
 
         # File object containing the modified ROM data (To create IPS patch)
-        if self.cmd != '-a' and self.cmd != '-ab':
+        if self.cmd not in ('-a', '-ab', '-i'):
             try:
                 self.modified_data = open(self.modified_file, 'rb').read()
             except:
@@ -132,7 +133,7 @@ class IPS(object):
 
         # File object containing the IPS patch
         try:
-            if self.cmd == '-a' or self.cmd == '-ab':
+            if self.cmd in ('-a', '-ab', '-i'):
                 self.patch_file_obj = bytearray(open(self.patch_file, 'rb').read())
             else:
                 self.patch_file_obj = open(self.patch_file, 'wb')
@@ -140,7 +141,7 @@ class IPS(object):
             print("> Cannot read %s" % self.patch_file + '.\n')
             sys.exit(1)
 
-        if self.cmd != '-a' and self.cmd != '-ab':
+        if self.cmd not in ('-a', '-ab', '-i'):
             # The IPS file format has a size limit of 16MB
             if len(self.modified_data) > self.FILE_LIMIT:
                 print('File is too large! ( Max 16MB )\nThe patch could be broken!')
@@ -176,6 +177,8 @@ class IPS(object):
         a = 5
         file_to_patch = self.original_file
 
+        info = True if self.cmd == '-i' else False
+
         if self.cmd == '-ab':
             try:
                 org_file_cont = bytearray(open(file_to_patch, 'rb').read())
@@ -186,7 +189,10 @@ class IPS(object):
 
             file_to_patch = self.modified_file
 
-        patched_file = bytearray(open(file_to_patch, 'rb').read())
+        if info:
+            patched_file = b''
+        else:
+            patched_file = bytearray(open(file_to_patch, 'rb').read())
 
         while a < len(self.patch_file_obj) - 3:
             # Get offset
@@ -196,6 +202,9 @@ class IPS(object):
             # Get packet size
             size = get_uint16(self.patch_file_obj, a)
             a += 2
+
+            if info and size:
+                print('INFO:', hex(offset), hex(size), self.patch_file_obj[a:a+size].hex('.'))
 
             if size == 0:
                 # Get RLE repeat count
@@ -210,12 +219,15 @@ class IPS(object):
                 repeat = self.patch_file_obj[a]
                 a += 1
 
-                for x in range(rle_size):
-                    try:
-                        patched_file[offset + x] = repeat
-                    except:
-                        print('> Error - Unable to parse the patch!')
-                        sys.exit(1)
+                if info:
+                    print('INFO:', hex(offset), 'repeat', hex(repeat), 'x', rle_size)
+                else:
+                    for x in range(rle_size):
+                        try:
+                            patched_file[offset + x] = repeat
+                        except:
+                            print('> Error - Unable to parse the patch!')
+                            sys.exit(1)
             else:
                 # Grow the patched file if needed
                 if (offset + size) > len(patched_file):
@@ -223,12 +235,15 @@ class IPS(object):
 
                 # Normal packet, copy from patch to file
                 for x in range(size):
-                    try:
-                        patched_file[offset + x] = self.patch_file_obj[a]
+                    if info:
                         a += 1
-                    except:
-                        print('> Error - Unable to parse the patch!')
-                        sys.exit(1)
+                    else:
+                        try:
+                            patched_file[offset + x] = self.patch_file_obj[a]
+                            a += 1
+                        except:
+                            print('> Error - Unable to parse the patch!')
+                            sys.exit(1)
 
         try:
             # Write modified data
@@ -324,7 +339,7 @@ class IPS(object):
 if __name__ == '__main__':
     arg_len = len(sys.argv)
 
-    if arg_len < 4:
+    if sys.argv[1] != '-i' and arg_len < 4:
         usage()
 
     if sys.argv[1] == '-a':
@@ -341,6 +356,11 @@ if __name__ == '__main__':
     elif sys.argv[1] == '-c':
         patch_file_name = sys.argv[3]+'.ips' if arg_len == 4 else sys.argv[4]
         ips = IPS(sys.argv[1], sys.argv[2], sys.argv[3], patch_file_name)
+        ips()
+
+    elif sys.argv[1] == '-i':
+        ips = IPS(sys.argv[1], None, None, sys.argv[2])
+        print('INFO')
         ips()
 
     else:
