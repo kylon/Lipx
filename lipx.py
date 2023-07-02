@@ -45,6 +45,13 @@ def get_uint24(data, index):
     return int((data[index] << 16) | (data[index + 1] << 8) | data[index + 2])
 
 
+# Helper function to display patch data in INFO mode
+def format_patch(offset, size, data, rle=0):
+    data = data.hex('.')
+    repeat = f' REPEAT x {rle}' if rle else ''
+    return f'{hex(offset)[2:].zfill(6)} ({str(size).zfill(2)}): {data}{repeat}'
+
+
 class IPS(object):
     def __init__(self, cmd, original_file, modified_file, patch_file):
         # 16MB Max size of an IPS file - 3byte int
@@ -178,6 +185,8 @@ class IPS(object):
         file_to_patch = self.original_file
 
         info = True if self.cmd == '-i' else False
+        if info:
+            print(f'Patch data for {self.patch_file}:\n')
 
         if self.cmd == '-ab':
             try:
@@ -204,7 +213,7 @@ class IPS(object):
             a += 2
 
             if info and size:
-                print('INFO:', hex(offset), hex(size), self.patch_file_obj[a:a+size].hex('.'))
+                print(format_patch(offset, size, self.patch_file_obj[a:a+size]))
 
             if size == 0:
                 # Get RLE repeat count
@@ -220,7 +229,7 @@ class IPS(object):
                 a += 1
 
                 if info:
-                    print('INFO:', hex(offset), 'repeat', hex(repeat), 'x', rle_size)
+                    print(format_patch(offset, size, repeat.to_bytes(1, 'big'), rle_size))
                 else:
                     for x in range(rle_size):
                         try:
@@ -244,6 +253,8 @@ class IPS(object):
                         except:
                             print('> Error - Unable to parse the patch!')
                             sys.exit(1)
+        if info:
+            return True
 
         try:
             # Write modified data
@@ -360,7 +371,6 @@ if __name__ == '__main__':
 
     elif sys.argv[1] == '-i':
         ips = IPS(sys.argv[1], None, None, sys.argv[2])
-        print('INFO')
         ips()
 
     else:
