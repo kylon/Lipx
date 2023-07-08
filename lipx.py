@@ -47,9 +47,13 @@ def get_uint24(data, index):
 
 # Helper function to display patch data in INFO mode
 def format_patch(offset, size, data, rle=0):
-    data = data.hex('.')
+    if (offset ^ size) & 1:
+        data.append(0)
+        data = data.hex(' ', 2)[:-2]
+    else:
+        data = data.hex(' ', 2)
     repeat = f' REPEAT x {rle}' if rle else ''
-    return f'{hex(offset)[2:].zfill(6)} ({str(size).zfill(2)}): {data}{repeat}'
+    return f'{hex(offset)[2:].zfill(6)} ({str(size).zfill(2)}): {"  " * (offset & 1) + data}{repeat}'
 
 
 class IPS(object):
