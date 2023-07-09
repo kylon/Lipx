@@ -8,6 +8,11 @@ import sys
 
 VERSION = '1.2'
 _ntuple_diskusage = collections.namedtuple('usage', 'total used free')
+
+# Modes:
+APPLY = '-a'
+BACKUP_APPLY = '-ab'
+CREATE = '-c'
 INSPECT = 'inspect'
 
 
@@ -79,9 +84,9 @@ class IPS(object):
 
         self._setup_files()
 
-        if self.cmd == '-c':
+        if self.cmd == CREATE:
             ret = self.create_ips()
-        elif self.cmd in ('-a', '-ab', INSPECT):
+        elif self.cmd in (APPLY, BACKUP_APPLY, INSPECT):
             ret = self.apply_ips()
 
         if not ret:
@@ -106,7 +111,7 @@ class IPS(object):
             print('> Not enough space on this disk!\n')
             sys.exit(1)
 
-        if self.cmd == '-ab':
+        if self.cmd == BACKUP_APPLY:
             if not self.__check_disk_space(self.original_file):
                 print('> Not enough space on this disk!\n')
                 sys.exit(1)
@@ -120,7 +125,7 @@ class IPS(object):
                 sys.exit(1)
 
         # File object containing the modified ROM data (To create IPS patch)
-        if self.cmd not in ('-a', '-ab', INSPECT):
+        if self.cmd not in (APPLY, BACKUP_APPLY, INSPECT):
             try:
                 self.modified_data = open(self.modified_file, 'rb').read()
             except:
@@ -129,7 +134,7 @@ class IPS(object):
 
         # File object containing the IPS patch
         try:
-            if self.cmd in ('-a', '-ab', INSPECT):
+            if self.cmd in (APPLY, BACKUP_APPLY, INSPECT):
                 self.patch_file_obj = bytearray(open(self.patch_file, 'rb').read())
             else:
                 self.patch_file_obj = open(self.patch_file, 'wb')
@@ -137,7 +142,7 @@ class IPS(object):
             print(f'> Cannot read {self.patch_file}.\n')
             sys.exit(1)
 
-        if self.cmd not in ('-a', '-ab', INSPECT):
+        if self.cmd not in (APPLY, BACKUP_APPLY, INSPECT):
             # The IPS file format has a size limit of 16MB
             if len(self.modified_data) > self.FILE_LIMIT:
                 print('File is too large! ( Max 16MB )\nThe patch could be broken!')
@@ -176,7 +181,7 @@ class IPS(object):
         if inspect:
             print(f'Patch data for {self.patch_file}:\n')
 
-        if self.cmd == '-ab':
+        if self.cmd == BACKUP_APPLY:
             try:
                 org_file_cont = bytearray(open(file_to_patch, 'rb').read())
                 open(self.modified_file, 'wb').write(org_file_cont)
@@ -348,19 +353,19 @@ if __name__ == '__main__':
 
     if args.a:
         original_file, patch_file = args.a
-        ips = IPS('-a', original_file, '', patch_file)
+        ips = IPS(APPLY, original_file, '', patch_file)
         ips()
 
     elif args.ab:
         original_file, patch_file = args.ab
         patched_file_name = args.outputFile or f'Patched_{original_file}'
-        ips = IPS('-ab', original_file, patched_file_name, patch_file)
+        ips = IPS(BACKUP_APPLY, original_file, patched_file_name, patch_file)
         ips()
 
     elif args.c:
         original_file, modified_file = args.c
         patch_file = output_file or f'{modified_file}.ips'
-        ips = IPS('-c', original_file, modified_file, patch_file)
+        ips = IPS(CREATE, original_file, modified_file, patch_file)
         ips()
 
     elif args.inspect:
