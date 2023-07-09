@@ -30,7 +30,7 @@ def get_uint24(data, index):
     return int((data[index] << 16) | (data[index + 1] << 8) | data[index + 2])
 
 
-# Helper function to display patch data in INFO mode
+# Helper function to display patch data in INSPECT mode
 def format_patch(offset, size, data, rle=0):
     if (offset ^ size) & 1:
         data.append(0)
@@ -75,7 +75,7 @@ class IPS(object):
     def __call__(self):
         ret = False
 
-        print('### Lipx v' + VERSION + ' - Linux IPS Tool ###\n')
+        print(f'### Lipx v{VERSION} - Linux IPS Tool ###\n')
 
         self._setup_files()
 
@@ -116,7 +116,7 @@ class IPS(object):
             try:
                 self.original_data = open(self.original_file, 'rb').read()
             except:
-                print("> Cannot read %s" % self.original_file + '.\n')
+                print(f'> Cannot read {self.original_file}.\n')
                 sys.exit(1)
 
         # File object containing the modified ROM data (To create IPS patch)
@@ -124,7 +124,7 @@ class IPS(object):
             try:
                 self.modified_data = open(self.modified_file, 'rb').read()
             except:
-                print("> Cannot read %s" % self.modified_file + '.\n')
+                print(f'> Cannot read {self.modified_file}.\n')
                 sys.exit(1)
 
         # File object containing the IPS patch
@@ -134,14 +134,13 @@ class IPS(object):
             else:
                 self.patch_file_obj = open(self.patch_file, 'wb')
         except:
-            print("> Cannot read %s" % self.patch_file + '.\n')
+            print(f'> Cannot read {self.patch_file}.\n')
             sys.exit(1)
 
         if self.cmd not in ('-a', '-ab', INSPECT):
             # The IPS file format has a size limit of 16MB
             if len(self.modified_data) > self.FILE_LIMIT:
                 print('File is too large! ( Max 16MB )\nThe patch could be broken!')
-
         return True
 
     def write_record(self, record_data, overide_size=0):
@@ -182,7 +181,7 @@ class IPS(object):
                 org_file_cont = bytearray(open(file_to_patch, 'rb').read())
                 open(self.modified_file, 'wb').write(org_file_cont)
             except:
-                print('> Error - Cannot create %s' % self.modified_file)
+                print(f'> Error - Cannot create {self.modified_file}')
                 sys.exit(1)
 
             file_to_patch = self.modified_file
@@ -252,7 +251,7 @@ class IPS(object):
             print('> Error - Cannot write to file!')
             sys.exit(1)
 
-        print('> Success - Patch applied to %s' % file_to_patch)
+        print(f'> Success - Patch applied to {file_to_patch}')
 
         return True
 
@@ -307,7 +306,7 @@ class IPS(object):
                 # Records have a max size of 0xFFFF as the size header is a short
                 # Check our current position and if we at the max size end the record and start a new one
                 if len(record) == self.RECORD_LIMIT - 1:
-                    print("Truncating overlong record: %s %s" % (len(record), hex(len(record))))
+                    print(f'Truncating overlong record: {len(record)} {hex(len(record))}')
 
                     record_begun = False
                     record.append(self.modified_data[pos])
@@ -331,7 +330,7 @@ class IPS(object):
         self.patch_size += len(self.EOF_ASCII)
         self.patch_file_obj.close()
 
-        print("> Success - Patch file: %s" % self.patch_file)
+        print(f'> Success - Patch file: {self.patch_file}')
 
         return True
 
