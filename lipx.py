@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import collections
 import os
 import struct
@@ -16,23 +17,6 @@ def disk_usage(path):
     used = (st.f_blocks - st.f_bfree) * st.f_frsize
 
     return _ntuple_diskusage(total, used, free)
-
-
-def usage():
-    this = os.path.basename(sys.argv[0])
-
-    print('\nLipx v' + VERSION + ' - Linux IPS tool\n\n' +
-           'Usage:\n\n' +
-           '    == Apply patch\n' +
-           '    ' + this + ' -a originalFile patchFile\n\n' +
-           '    == Create a copy and apply the patch - original is untouched\n' +
-           '    ' + this + ' -ab originalFile patchFile [outputFile]\n\n' +
-           '    == Create IPS patch\n' +
-           '    ' + this + ' -c originalFile modifiedFile [outputFile]\n\n' +
-           'Arguments:\n' +
-           '    [] optional argument\n')
-
-    sys.exit(1)
 
 
 # Helper function to get an integer from a bytearray (Big endian)
@@ -322,28 +306,32 @@ class IPS(object):
 
 
 if __name__ == '__main__':
-    arg_len = len(sys.argv)
+    parser = argparse.ArgumentParser(description=f'Lipx v{VERSION} - Linux IPS tool')
+    parser.add_argument('-a', help='Apply patch', nargs=2, metavar=('originalFile', 'patchFile'))
+    parser.add_argument('-ab', help='Create a copy and apply the patch - original is untouched', nargs=2, metavar=('originalFile', 'patchFile'))
+    parser.add_argument('-c', help='Create IPS patch', nargs=2, metavar=('originalFile', 'modifiedFile'))
+    parser.add_argument('outputFile', help='Optional outputFile', nargs='?')
+    args = parser.parse_args()
 
-    if arg_len < 4:
-        usage()
+    output_file = args.outputFile
 
-    if sys.argv[1] == '-a':
-        ips = IPS(sys.argv[1], sys.argv[2], '', sys.argv[3])
+    if args.a:
+        original_file, patch_file = args.a
+        ips = IPS('-a', original_file, '', patch_file)
         ips()
 
-    elif sys.argv[1] == '-ab':
-        # sys.argv[4] is user supplied _patched_ file name.
-        # Keep the compability - note the order of arguments.
-        patched_file_name = 'Patched_'+sys.argv[2] if arg_len == 4 else sys.argv[4]
-        ips = IPS(sys.argv[1], sys.argv[2], patched_file_name, sys.argv[3])
+    elif args.ab:
+        original_file, patch_file = args.ab
+        patched_file_name = args.outputFile or f'Patched_{original_file}'
+        ips = IPS('-ab', original_file, patched_file_name, patch_file)
         ips()
 
-    elif sys.argv[1] == '-c':
-        patch_file_name = sys.argv[3]+'.ips' if arg_len == 4 else sys.argv[4]
-        ips = IPS(sys.argv[1], sys.argv[2], sys.argv[3], patch_file_name)
+    elif args.c:
+        original_file, modified_file = args.c
+        patch_file = output_file or f'{modified_file}.ips'
+        ips = IPS('-c', original_file, modified_file, patch_file)
         ips()
 
     else:
-        usage()
-
-    sys.exit(0)
+        parser.print_help(sys.stderr)
+        sys.exit(1)
