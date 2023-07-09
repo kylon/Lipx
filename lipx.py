@@ -201,7 +201,7 @@ class IPS(object):
             size = get_uint16(self.patch_file_obj, a)
             a += 2
 
-            if info and size:
+            if inspect and size:
                 print(format_patch(offset, size, self.patch_file_obj[a:a+size]))
 
             if size == 0:
@@ -217,7 +217,7 @@ class IPS(object):
                 repeat = self.patch_file_obj[a]
                 a += 1
 
-                if info:
+                if inspect:
                     print(format_patch(offset, size, repeat.to_bytes(1, 'big'), rle_size))
                 else:
                     for x in range(rle_size):
@@ -233,7 +233,7 @@ class IPS(object):
 
                 # Normal packet, copy from patch to file
                 for x in range(size):
-                    if info:
+                    if inspect:
                         a += 1
                     else:
                         try:
@@ -242,7 +242,7 @@ class IPS(object):
                         except:
                             print('> Error - Unable to parse the patch!')
                             sys.exit(1)
-        if info:
+        if inspect:
             return True
 
         try:
@@ -341,7 +341,7 @@ if __name__ == '__main__':
     parser.add_argument('-a', help='Apply patch', nargs=2, metavar=('originalFile', 'patchFile'))
     parser.add_argument('-ab', help='Create a copy and apply the patch - original is untouched', nargs=2, metavar=('originalFile', 'patchFile'))
     parser.add_argument('-c', help='Create IPS patch', nargs=2, metavar=('originalFile', 'modifiedFile'))
-    parser.add_argument('-i', '--inspect', help='Inspect the changes made by an IPS file')
+    parser.add_argument('-i', '--inspect', help='Inspect the changes made by an IPS file', metavar='patchFile')
     parser.add_argument('outputFile', help='Optional outputFile', nargs='?')
     args = parser.parse_args()
 
