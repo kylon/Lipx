@@ -13,7 +13,7 @@ _ntuple_diskusage = collections.namedtuple('usage', 'total used free')
 APPLY = '-a'
 BACKUP_APPLY = '-ab'
 CREATE = '-c'
-INSPECT = 'inspect'
+INSPECT = '-i'
 
 
 def disk_usage(path):
