@@ -5,9 +5,16 @@ import collections
 import os
 import struct
 import sys
+from textwrap import wrap
 
 VERSION = '1.2'
 _ntuple_diskusage = collections.namedtuple('usage', 'total used free')
+
+# Modes:
+APPLY = '-a'
+BACKUP_APPLY = '-ab'
+CREATE = '-c'
+INSPECT = '-i'
 
 
 def disk_usage(path):
@@ -27,6 +34,22 @@ def get_uint16(data, index):
 # Helper function to get an integer from a bytearray (Big endian)
 def get_uint24(data, index):
     return int((data[index] << 16) | (data[index + 1] << 8) | data[index + 2])
+
+
+# Helper function to display patch data in INSPECT mode
+def format_patch(offset, size, data, rle=0):
+    PAD = '..'  # byte pad for odd/even byte alignment
+    SEP = ' '   # Hex word separator
+    if (offset ^ size) & 1:
+        data.append(0)
+        data = data.hex(SEP, 2)[:-2]
+    else:
+        data = data.hex(SEP, 2)
+    rom_offset = f'{hex(offset)[2:].zfill(6)}'
+    byte_count = f'({str(size|rle)})'
+    repeat = f'{" " * (2 * (~offset & 1))} <REPEAT x {rle}>' if rle else ''
+    patch_data = f'\n{" "*15}'.join(wrap(f'{PAD * (offset & 1) + data}{repeat}', width=40))
+    return f'{rom_offset}{byte_count.rjust(7)}: {patch_data}'
 
 
 class IPS(object):
@@ -63,13 +86,13 @@ class IPS(object):
     def __call__(self):
         ret = False
 
-        print('### Lipx v' + VERSION + ' - Linux IPS Tool ###\n')
+        print(f'### Lipx v{VERSION} - Linux IPS Tool ###\n')
 
         self._setup_files()
 
-        if self.cmd == '-c':
+        if self.cmd == CREATE:
             ret = self.create_ips()
-        elif self.cmd == '-a' or self.cmd == '-ab':
+        elif self.cmd in (APPLY, BACKUP_APPLY, INSPECT):
             ret = self.apply_ips()
 
         if not ret:
@@ -94,41 +117,41 @@ class IPS(object):
             print('> Not enough space on this disk!\n')
             sys.exit(1)
 
-        if self.cmd == '-ab':
+        if self.cmd == BACKUP_APPLY:
             if not self.__check_disk_space(self.original_file):
                 print('> Not enough space on this disk!\n')
                 sys.exit(1)
 
         # File object containing the original (base) ROM data
-        try:
-            self.original_data = open(self.original_file, 'rb').read()
-        except:
-            print("> Cannot read %s" % self.original_file + '.\n')
-            sys.exit(1)
+        if self.cmd != INSPECT:
+            try:
+                self.original_data = open(self.original_file, 'rb').read()
+            except:
+                print(f'> Cannot read {self.original_file}.\n')
+                sys.exit(1)
 
         # File object containing the modified ROM data (To create IPS patch)
-        if self.cmd != '-a' and self.cmd != '-ab':
+        if self.cmd not in (APPLY, BACKUP_APPLY, INSPECT):
             try:
                 self.modified_data = open(self.modified_file, 'rb').read()
             except:
-                print("> Cannot read %s" % self.modified_file + '.\n')
+                print(f'> Cannot read {self.modified_file}.\n')
                 sys.exit(1)
 
         # File object containing the IPS patch
         try:
-            if self.cmd == '-a' or self.cmd == '-ab':
+            if self.cmd in (APPLY, BACKUP_APPLY, INSPECT):
                 self.patch_file_obj = bytearray(open(self.patch_file, 'rb').read())
             else:
                 self.patch_file_obj = open(self.patch_file, 'wb')
         except:
-            print("> Cannot read %s" % self.patch_file + '.\n')
+            print(f'> Cannot read {self.patch_file}.\n')
             sys.exit(1)
 
-        if self.cmd != '-a' and self.cmd != '-ab':
+        if self.cmd not in (APPLY, BACKUP_APPLY, INSPECT):
             # The IPS file format has a size limit of 16MB
             if len(self.modified_data) > self.FILE_LIMIT:
                 print('File is too large! ( Max 16MB )\nThe patch could be broken!')
-
         return True
 
     def write_record(self, record_data, overide_size=0):
@@ -160,17 +183,24 @@ class IPS(object):
         a = 5
         file_to_patch = self.original_file
 
-        if self.cmd == '-ab':
+        inspect = self.cmd == INSPECT
+        if inspect:
+            print(f'Patch data for {self.patch_file}:\n')
+
+        if self.cmd == BACKUP_APPLY:
             try:
                 org_file_cont = bytearray(open(file_to_patch, 'rb').read())
                 open(self.modified_file, 'wb').write(org_file_cont)
             except:
-                print('> Error - Cannot create %s' % self.modified_file)
+                print(f'> Error - Cannot create {self.modified_file}')
                 sys.exit(1)
 
             file_to_patch = self.modified_file
 
-        patched_file = bytearray(open(file_to_patch, 'rb').read())
+        if inspect:
+            patched_file = b''
+        else:
+            patched_file = bytearray(open(file_to_patch, 'rb').read())
 
         while a < len(self.patch_file_obj) - 3:
             # Get offset
@@ -180,6 +210,9 @@ class IPS(object):
             # Get packet size
             size = get_uint16(self.patch_file_obj, a)
             a += 2
+
+            if inspect and size:
+                print(format_patch(offset, size, self.patch_file_obj[a:a+size]))
 
             if size == 0:
                 # Get RLE repeat count
@@ -194,12 +227,15 @@ class IPS(object):
                 repeat = self.patch_file_obj[a]
                 a += 1
 
-                for x in range(rle_size):
-                    try:
-                        patched_file[offset + x] = repeat
-                    except:
-                        print('> Error - Unable to parse the patch!')
-                        sys.exit(1)
+                if inspect:
+                    print(format_patch(offset, size, bytearray(repeat.to_bytes(1, 'big')), rle_size))
+                else:
+                    for x in range(rle_size):
+                        try:
+                            patched_file[offset + x] = repeat
+                        except:
+                            print('> Error - Unable to parse the patch!')
+                            sys.exit(1)
             else:
                 # Grow the patched file if needed
                 if (offset + size) > len(patched_file):
@@ -207,12 +243,17 @@ class IPS(object):
 
                 # Normal packet, copy from patch to file
                 for x in range(size):
-                    try:
-                        patched_file[offset + x] = self.patch_file_obj[a]
+                    if inspect:
                         a += 1
-                    except:
-                        print('> Error - Unable to parse the patch!')
-                        sys.exit(1)
+                    else:
+                        try:
+                            patched_file[offset + x] = self.patch_file_obj[a]
+                            a += 1
+                        except:
+                            print('> Error - Unable to parse the patch!')
+                            sys.exit(1)
+        if inspect:
+            return True
 
         try:
             # Write modified data
@@ -221,7 +262,7 @@ class IPS(object):
             print('> Error - Cannot write to file!')
             sys.exit(1)
 
-        print('> Success - Patch applied to %s' % file_to_patch)
+        print(f'> Success - Patch applied to {file_to_patch}')
 
         return True
 
@@ -276,7 +317,7 @@ class IPS(object):
                 # Records have a max size of 0xFFFF as the size header is a short
                 # Check our current position and if we at the max size end the record and start a new one
                 if len(record) == self.RECORD_LIMIT - 1:
-                    print("Truncating overlong record: %s %s" % (len(record), hex(len(record))))
+                    print(f'Truncating overlong record: {len(record)} {hex(len(record))}')
 
                     record_begun = False
                     record.append(self.modified_data[pos])
@@ -300,7 +341,7 @@ class IPS(object):
         self.patch_size += len(self.EOF_ASCII)
         self.patch_file_obj.close()
 
-        print("> Success - Patch file: %s" % self.patch_file)
+        print(f'> Success - Patch file: {self.patch_file}')
 
         return True
 
@@ -310,6 +351,7 @@ if __name__ == '__main__':
     parser.add_argument('-a', help='Apply patch', nargs=2, metavar=('originalFile', 'patchFile'))
     parser.add_argument('-ab', help='Create a copy and apply the patch - original is untouched', nargs=2, metavar=('originalFile', 'patchFile'))
     parser.add_argument('-c', help='Create IPS patch', nargs=2, metavar=('originalFile', 'modifiedFile'))
+    parser.add_argument('-i', '--inspect', help='Inspect the changes made by an IPS file', metavar='patchFile')
     parser.add_argument('outputFile', help='Optional outputFile', nargs='?')
     args = parser.parse_args()
 
@@ -317,19 +359,23 @@ if __name__ == '__main__':
 
     if args.a:
         original_file, patch_file = args.a
-        ips = IPS('-a', original_file, '', patch_file)
+        ips = IPS(APPLY, original_file, '', patch_file)
         ips()
 
     elif args.ab:
         original_file, patch_file = args.ab
         patched_file_name = args.outputFile or f'Patched_{original_file}'
-        ips = IPS('-ab', original_file, patched_file_name, patch_file)
+        ips = IPS(BACKUP_APPLY, original_file, patched_file_name, patch_file)
         ips()
 
     elif args.c:
         original_file, modified_file = args.c
         patch_file = output_file or f'{modified_file}.ips'
-        ips = IPS('-c', original_file, modified_file, patch_file)
+        ips = IPS(CREATE, original_file, modified_file, patch_file)
+        ips()
+
+    elif args.inspect:
+        ips = IPS(INSPECT, None, None, args.inspect)
         ips()
 
     else:
