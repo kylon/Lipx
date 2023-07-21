@@ -5,6 +5,7 @@ import collections
 import os
 import struct
 import sys
+from textwrap import wrap
 
 VERSION = '1.2'
 _ntuple_diskusage = collections.namedtuple('usage', 'total used free')
@@ -37,13 +38,18 @@ def get_uint24(data, index):
 
 # Helper function to display patch data in INSPECT mode
 def format_patch(offset, size, data, rle=0):
+    PAD = '..'  # byte pad for odd/even byte alignment
+    SEP = ' '   # Hex word separator
     if (offset ^ size) & 1:
         data.append(0)
-        data = data.hex(' ', 2)[:-2]
+        data = data.hex(SEP, 2)[:-2]
     else:
-        data = data.hex(' ', 2)
-    repeat = f' REPEAT x {rle}' if rle else ''
-    return f'{hex(offset)[2:].zfill(6)} ({str(size).zfill(2)}): {"  " * (offset & 1) + data}{repeat}'
+        data = data.hex(SEP, 2)
+    rom_offset = f'{hex(offset)[2:].zfill(6)}'
+    byte_count = f'({str(size|rle)})'
+    repeat = f'{" " * (2 * (~offset & 1))} <REPEAT x {rle}>' if rle else ''
+    patch_data = f'\n{" "*15}'.join(wrap(f'{PAD * (offset & 1) + data}{repeat}', width=40))
+    return f'{rom_offset}{byte_count.rjust(7)}: {patch_data}'
 
 
 class IPS(object):
