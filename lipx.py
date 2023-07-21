@@ -222,7 +222,7 @@ class IPS(object):
                 a += 1
 
                 if inspect:
-                    print(format_patch(offset, size, repeat.to_bytes(1, 'big'), rle_size))
+                    print(format_patch(offset, size, bytearray(repeat.to_bytes(1, 'big')), rle_size))
                 else:
                     for x in range(rle_size):
                         try:
