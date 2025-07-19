@@ -107,11 +107,11 @@ int addIPSRecord(IPSPatch *patch, IPSRecord *record) {
         if (list == NULL)
             return -1;
 
-        ++patch->recordsLen;
         patch->recordsSize += inc;
         patch->records = list;
     }
 
+    ++patch->recordsLen;
     patch->records[patch->recordsLen - 1] = record;
     return 0;
 }

@@ -471,7 +471,9 @@ void createIPS(const char *original, const char *patched, const char *ips) {
         distance = prevRecord == NULL ? 0 : startOffset - (prevRecord->offset + prevRecord->len);
 
         while (b1 != b2 && diffDataLen < MAX_RECORD_SIZE) {
-            if ((diffDataLen + 1) >= diffDataSz) {
+            ++diffDataLen;
+
+            if (diffDataLen >= diffDataSz) {
                 diffDataSz += diffAllocSize;
                 unsigned char *tmp = reallocarray(diffData, diffDataSz, sizeof(char));
 
@@ -480,7 +482,6 @@ void createIPS(const char *original, const char *patched, const char *ips) {
                     goto exit;
                 }
 
-                ++diffDataLen;
                 diffData = tmp;
             }
 
@@ -522,10 +523,11 @@ void createIPS(const char *original, const char *patched, const char *ips) {
             } else { // merge both records
                 const long curPatchedPos = ftell(patchedfd);
                 const unsigned prevLen = prevRecord->len;
-                const unsigned nlen = prevRecord->len + distance + diffDataLen;
 
-                if (nlen >= prevRecord->size) {
-                    const unsigned nsize = nlen + 20;
+                prevRecord->len += distance + diffDataLen;
+
+                if (prevRecord->len >= prevRecord->size) {
+                    const unsigned nsize = prevRecord->len + 20;
                     unsigned char *tmp = reallocarray(prevRecord->data, nsize, sizeof(char));
 
                     if (tmp == NULL) {
@@ -533,7 +535,6 @@ void createIPS(const char *original, const char *patched, const char *ips) {
                         goto exit;
                     }
 
-                    prevRecord->len = nlen;
                     prevRecord->size = nsize;
                     prevRecord->data = tmp;
                 }
