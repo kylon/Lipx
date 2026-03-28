@@ -1,5 +1,7 @@
 # Linux IPS Tool  
 
+[![gitcgr](https://gitcgr.com/badge/kylon/Lipx.svg)](https://gitcgr.com/kylon/Lipx)
+
 ### IPS File Format  
   [zophar.net](http://zerosoft.zophar.net/ips.php)  
 
