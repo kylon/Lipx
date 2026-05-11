@@ -22,6 +22,20 @@
 
 #define MAX_RECORD_SIZE 0xffff
 
+#ifndef HAVE_REALLOCARRAY
+#include <stddef.h>
+#include <stdlib.h>
+#include <errno.h>
+
+static inline void *reallocarray(void *ptr, size_t nmemb, size_t size) {
+    if (size && nmemb > (size_t)-1 / size) {
+        errno = ENOMEM;
+        return NULL;
+    }
+    return realloc(ptr, nmemb * size);
+}
+#endif
+
 typedef struct {
     long offset;
     bool rle;
