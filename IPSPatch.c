@@ -102,7 +102,7 @@ IPSPatch *createIPSPatch() {
 int addIPSRecord(IPSPatch *patch, IPSRecord *record) {
     if ((patch->recordsLen + 1) >= patch->recordsSize) {
         const int inc = 10;
-        IPSRecord **list = reallocarray(patch->records, patch->recordsSize + inc, sizeof(IPSRecord *));
+        IPSRecord **list = realloc(patch->records, (patch->recordsSize + inc) * sizeof(IPSRecord *));
 
         if (list == NULL)
             return -1;

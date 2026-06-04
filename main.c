@@ -475,7 +475,7 @@ void createIPS(const char *original, const char *patched, const char *ips) {
 
             if (diffDataLen >= diffDataSz) {
                 diffDataSz += diffAllocSize;
-                unsigned char *tmp = reallocarray(diffData, diffDataSz, sizeof(char));
+                unsigned char *tmp = realloc(diffData, diffDataSz * sizeof(char));
 
                 if (tmp == NULL) {
                     LIPX_PRINT_ERR("failed to realloc memory for buffer");
@@ -528,7 +528,7 @@ void createIPS(const char *original, const char *patched, const char *ips) {
 
                 if (prevRecord->len >= prevRecord->size) {
                     const unsigned nsize = prevRecord->len + 20;
-                    unsigned char *tmp = reallocarray(prevRecord->data, nsize, sizeof(char));
+                    unsigned char *tmp = realloc(prevRecord->data, nsize * sizeof(char));
 
                     if (tmp == NULL) {
                         LIPX_PRINT_ERR("failed to realloc merge data");
